@@ -2,8 +2,8 @@ apply plugin: 'java'
 apply plugin: 'application'
 
 mainClassName = 'GmailLabelRemover'
-sourceCompatibility = 11
-targetCompatibility = 11
+sourceCompatibility = 16
+targetCompatibility = 16
 version = '1.0'
 
 repositories {
