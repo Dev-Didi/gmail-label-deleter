@@ -9,6 +9,7 @@ import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.util.store.FileDataStoreFactory;
+import com.google.api.services.gmail.Gmail;
 import com.google.api.services.gmail.GmailScopes;
 
 import java.io.FileNotFoundException;
@@ -40,7 +41,13 @@ public class Authenticator {
      * @return An authorized Credential object.
      * @throws IOException If the credentials.json file cannot be found.
      */
-    public static Credential getCredentials(final NetHttpTransport HTTP_TRANSPORT)
+    private Credential credential;
+    private Gmail service;
+    Authenticator() {
+        credential = null;
+        service = null;
+    }
+    public Credential getCredentials(final NetHttpTransport HTTP_TRANSPORT)
             throws IOException {
         // Load client secrets.
         InputStream in = GmailCleaner.class.getResourceAsStream(CREDENTIALS_FILE_PATH);
@@ -57,8 +64,17 @@ public class Authenticator {
                 .setAccessType("offline")
                 .build();
         LocalServerReceiver receiver = new LocalServerReceiver.Builder().setPort(8888).build();
-        Credential credential = new AuthorizationCodeInstalledApp(flow, receiver).authorize("user");
+        this.credential = new AuthorizationCodeInstalledApp(flow, receiver).authorize("user");
         //returns an authorized Credential object.
-        return credential;
+        return this.credential;
+    }
+
+    public Gmail getService(final NetHttpTransport HTTP_TRANSPORT,final String APPLICATION_NAME) throws IOException {
+        if (service != null) return service;
+        if (credential == null) getCredentials(HTTP_TRANSPORT);
+        service = new Gmail.Builder(HTTP_TRANSPORT, JSON_FACTORY, credential)
+                .setApplicationName(APPLICATION_NAME)
+                .build();
+        return service;
     }
 }

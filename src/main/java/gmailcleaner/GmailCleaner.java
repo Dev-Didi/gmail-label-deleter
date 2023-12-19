@@ -1,33 +1,25 @@
 
 package gmailcleaner;
 import com.google.api.client.auth.oauth2.Credential;
-import com.google.api.client.extensions.java6.auth.oauth2.AuthorizationCodeInstalledApp;
-import com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver;
-import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow;
-import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.gson.GsonFactory;
-import com.google.api.client.util.store.FileDataStoreFactory;
 import com.google.api.services.gmail.Gmail;
-import com.google.api.services.gmail.GmailScopes;
 import com.google.api.services.gmail.model.*;
 
-import java.io.FileNotFoundException;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.rmi.UnexpectedException;
 import java.security.GeneralSecurityException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
-import java.time.Month;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 
-import gmailcleaner.CleanerQuery;
-import gmailcleaner.Authenticator;
+import javax.swing.*;
 /* class to demonstrate use of Gmail list labels API */
 
 public class GmailCleaner{
@@ -38,27 +30,100 @@ public class GmailCleaner{
   static long MONTH = 2629743;
   private static final String APPLICATION_NAME = "Gmail API Label Cleaner";
   /**
-   * Global instance of the JSON factory.
-   */
-  private static final JsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
-  /**
    * Directory to store authorization tokens for this application.
    */
+
+  // Auth object holds both the credentials and the gmail service. can still expose these as regular fields too
+          // in the login method
+  private static Authenticator auth;
+
+    /**
+     * Global instance of the JSON factory.
+     */
+    private static final JsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
+    private static String user;
+  private static Credential cred;
+  private static Gmail service;
+    private JButton loginButton;
+    private JTextArea introMessage;
+
+    public GmailCleaner() {
+        loginButton.addActionListener(new ActionListener()  {
+            @Override
+            public void actionPerformed(ActionEvent e)  {
+                try {
+                    login();
+                    showMainMenu();
+                }
+                catch(IOException | GeneralSecurityException ex) {
+                    return;
+                }
+            }
+        }) ;
+    }
+
+    public void showMainMenu() {
+        loginButton.removeAll();
+
+    }
+    /**
+     * This method is responsible for populating the authenticator and makes the user authenticate
+     * with their google account.
+     * @throws IOException
+     * @throws GeneralSecurityException
+     */
+  private static void login() throws IOException, GeneralSecurityException{
+      auth = new Authenticator();
+      final NetHttpTransport HTTP_TRANSPORT = GoogleNetHttpTransport.newTrustedTransport();
+      Credential userCred = auth.getCredentials(HTTP_TRANSPORT);
+      if (userCred != null) {
+          user = "me";
+          service = auth.getService(HTTP_TRANSPORT,APPLICATION_NAME);
+      }
+  }
+
+  private static List<Label> labels;
+
+    /**
+     * gets the list of all labels tied to the user account
+     * @return List\<Label\>
+     * @throws NullPointerException
+     * @throws IOException
+     */
+  private static List<Label> getLabels() throws NullPointerException, IOException {
+    if (service == null) throw new NullPointerException("Can't get labels: gmail service not established");
+    if(labels != null) return labels;
+    else {
+        ListLabelsResponse listResponse = service.users().labels().list(user).execute();
+        labels = listResponse.getLabels();
+        return labels;
+    }
+  }
+
+    private static List<String> selectedLabels;
+    public static List<String> getSelectedLabels() {
+        return selectedLabels;
+    }
+
+    public static void setSelectedLabels(List<String> selectedLabels) {
+        GmailCleaner.selectedLabels = selectedLabels;
+    }
+
+    private void selectLabel(String labelId) throws UnexpectedException {
+        for (Label lab : labels) {
+            if (lab.getId().equals(labelId) && !selectedLabels.contains(lab.getId())) {
+                selectedLabels.add(lab.getId());
+                return;
+            }
+        }
+        if (!selectedLabels.contains(labelId)) throw new UnexpectedException("unknown label tried to be added");
+        else return;
+    }
+
  public static void main(String... args) throws IOException, GeneralSecurityException {
     System.out.println("Starting...");
-    // Build a new authorized API client service.
-    final NetHttpTransport HTTP_TRANSPORT = GoogleNetHttpTransport.newTrustedTransport();
-    Credential userCred = Authenticator.getCredentials(HTTP_TRANSPORT);
-    Gmail service = new Gmail.Builder(HTTP_TRANSPORT, JSON_FACTORY, userCred)
-        .setApplicationName(APPLICATION_NAME)
-        .build();
-
-    // Print the labels in the user's account.
-    String user = "me";
-    ListLabelsResponse listResponse = service.users().labels().list(user).execute();
-
-    // get the labels
-    List<Label> labels = listResponse.getLabels();
+    login();
+    List<Label> labels = getLabels();
     // List<String> wantedLabelNames = new ArrayList<>(Arrays.asList("CATEGORY_SOCIAL","CATEGORY_PROMOTIONS"));
     List<String> wantedLabelNames = new ArrayList<>(Arrays.asList("UBER_TEST"));
     List<String> wantedLabelIds = new ArrayList<>();
